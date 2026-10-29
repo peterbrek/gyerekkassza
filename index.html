@@ -105,16 +105,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--szoveg);outline
 .cimke-kicsi{font-size:13px;font-weight:600;color:var(--masod);text-transform:uppercase;letter-spacing:.4px}
 .nagy-szam{margin:8px 0 0;font-size:34px;line-height:40px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
 .egyenleg-mondat{margin:2px 0 0;font-size:15px;line-height:20px;color:var(--halvany)}
-.csuszka{margin-top:20px}
-.csuszka-cimkek{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));font-size:13px;line-height:16px;font-weight:600}
-.csuszka-cimkek .sz0,.csuszka-cimkek .sz1{color:var(--szoveg-sz)}
-.csuszka-cimkek .kozep{text-align:center;font-weight:500;color:var(--masod)}
-.csuszka-cimkek .sz1{text-align:right}
-.csuszka-palya{position:relative;height:28px;margin-top:6px}
-.csuszka-sav{position:absolute;left:0;right:0;top:10px;height:8px;border-radius:4px;background:var(--sav)}
-.csuszka-tolt{position:absolute;top:10px;height:8px;background:var(--szin)}
-.csuszka-kozepvonal{position:absolute;left:50%;top:4px;width:2px;height:20px;margin-left:-1px;border-radius:1px;background:var(--szoveg)}
-.csuszka-gomb{position:absolute;top:0;width:28px;height:28px;margin-left:-14px;border-radius:14px;background:var(--gombocska);box-shadow:0 1px 4px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.06)}
 
 /* Tételek */
 .kereso{position:relative}
@@ -249,9 +239,6 @@ input::placeholder{color:var(--mezo-szoveg)}
 <script>
 'use strict';
 
-// Ekkora eltérésnél (Ft) ér a csúszka gombja a sáv széléig.
-var SKALA = 40000;
-
 var HONAPOK = ['január', 'február', 'március', 'április', 'május', 'június', 'július', 'augusztus', 'szeptember', 'október', 'november', 'december'];
 var HONAP_ROVID = ['jan.', 'febr.', 'márc.', 'ápr.', 'máj.', 'jún.', 'júl.', 'aug.', 'szept.', 'okt.', 'nov.', 'dec.'];
 var NAPOK = ['vasárnap', 'hétfő', 'kedd', 'szerda', 'csütörtök', 'péntek', 'szombat'];
@@ -323,7 +310,8 @@ function honapCim(kulcs) {
 function ujId() {
   var b = new Uint8Array(6);
   crypto.getRandomValues(b);
-  return Array.prototype.map.call(b, function (x) { return (x < 16 ? '0' : '') + x.toString(16); }).join('');
+  // Betűvel kezdődik, így a táblázat sosem alakítja számmá.
+  return 't' + Array.prototype.map.call(b, function (x) { return (x < 16 ? '0' : '') + x.toString(16); }).join('').slice(0, 11);
 }
 
 // ───────────── Állapot ─────────────
@@ -554,36 +542,22 @@ function egyenlegBlokk() {
     if (t.ki === s0.id) o0 += t.osszeg;
     else if (t.ki === s1.id) o1 += t.osszeg;
   });
-  // Ennyivel tér el a többet fizető fél a fele-fele aránytól.
-  var elteres = Math.round(Math.abs(o1 - o0) / 2);
-  var fele = elteres === 0;
+  // A kezdetektől számolt különbség a két fél befizetései között.
+  var kulonbseg = Math.abs(o1 - o0);
   var tobbet = o1 > o0 ? s1 : s0;
-  var x = Math.min(elteres / SKALA, 1) * 50;
-  var jobbra = tobbet === s1;
-  var gombHely = fele ? 50 : (jobbra ? 50 + x : 50 - x);
+  var masik = tobbet === s1 ? s0 : s1;
 
   return el('section', { class: 'kartya belso', 'aria-labelledby': 'cim-egyenleg' },
     el('span', { class: 'cimke-kicsi', id: 'cim-egyenleg', text: 'Egyenleg' }),
-    el('p', { class: 'nagy-szam', text: fmtFt(elteres) }),
-    el('p', { class: 'egyenleg-mondat' }, fele ? 'Pontosan fele-fele' : [nevSzinnel(tobbet.id), ' ennyivel vállalt többet']),
-    el('div', { class: 'csuszka', 'aria-hidden': 'true' },
-      el('div', { class: 'csuszka-cimkek' },
-        el('span', { class: 'sz0', text: s0.nev }),
-        el('span', { class: 'kozep', text: 'fele-fele' }),
-        el('span', { class: 'sz1', text: s1.nev })
-      ),
-      el('div', { class: 'csuszka-palya' },
-        el('div', { class: 'csuszka-sav' }),
-        fele ? null : el('div', {
-          class: 'csuszka-tolt ' + szOsztaly(tobbet.id),
-          style: (jobbra ? 'left:50%;border-radius:0 4px 4px 0;' : 'left:' + (50 - x) + '%;border-radius:4px 0 0 4px;') + 'width:' + x + '%'
-        }),
-        el('div', { class: 'csuszka-kozepvonal' }),
-        el('div', { class: 'csuszka-gomb', style: 'left:clamp(14px,' + gombHely + '%,calc(100% - 14px))' })
-      )
-    )
+    el('p', { class: 'nagy-szam', text: fmtFt(kulonbseg) }),
+    el('p', { class: 'egyenleg-mondat' }, kulonbseg === 0
+      ? 'Pontosan fele-fele'
+      : [nevSzinnel(tobbet.id), ' ennyivel fizetett többet ' + nalNel(masik.nev)])
   );
 }
+
+// Zsófi → Zsófinál, Peti → Petinél (magánhangzó-illeszkedés szerint).
+function nalNel(nev) { return nev + (/[aáoóuú]/i.test(nev) ? 'nál' : 'nél'); }
 
 // Tételek: keresés, szűrés, hónap és nap szerinti csoportok
 function rajzTetelek() {
